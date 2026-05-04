@@ -17,9 +17,10 @@ class Octree:
         self.max_points = max_points
         self.verts = verts
         self.root = None
+        self.all_nodes = []
 
         self.create_octree()
-
+        self.collect_nodes(self.root, self.all_nodes)
 
     def tree_division(self, oc_node: Node):
         half = oc_node.half_size / 2.0
