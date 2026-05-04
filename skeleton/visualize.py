@@ -25,6 +25,9 @@ def draw_box_lines(all_nodes):
         curve_network.set_color((1.0, 0.0, 0.0))
         curve_network.set_radius(0.001)
 
+#def draw_planes():
+    
+
 def show_pointcloud(verts):
     ps.register_point_cloud("my points", verts)
 

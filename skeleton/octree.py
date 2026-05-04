@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class Node:
+class OCNode:
     def __init__(self, center, half_size, points, depth=0):
         self.center = center
         self.half_size = half_size
@@ -22,7 +22,7 @@ class Octree:
         self.create_octree()
         self.collect_nodes(self.root, self.all_nodes)
 
-    def tree_division(self, oc_node: Node):
+    def tree_division(self, oc_node: OCNode):
         half = oc_node.half_size / 2.0
         offsets = np.array([
             [-1,-1,-1], [1,-1,-1], [-1, 1,-1], [1, 1,-1],
@@ -45,13 +45,13 @@ class Octree:
             child_points = np.array(children_points[i])
             if(child_points.size == 0):
                 continue
-            child = Node(child_center, half, child_points, oc_node.depth + 1)
+            child = OCNode(child_center, half, child_points, oc_node.depth + 1)
             oc_node.children.append(child)
 
         oc_node.points = None
         oc_node.is_leaf = False
 
-    def build_octree(self, oc_node: Node):
+    def build_octree(self, oc_node: OCNode):
         if oc_node.depth >= self.max_depth:
             return
 
@@ -68,11 +68,11 @@ class Octree:
         center = (min_corner + max_corner) / 2
         half_size = np.max(max_corner - min_corner) / 2
 
-        root_node = Node(center, half_size, self.verts)
+        root_node = OCNode(center, half_size, self.verts)
         self.build_octree(root_node)
         self.root = root_node
 
-    def collect_nodes(self, node: Node, all_nodes):
+    def collect_nodes(self, node: OCNode, all_nodes):
         if node.is_leaf:
             all_nodes.append(node)
         else:
