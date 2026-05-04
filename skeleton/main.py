@@ -4,7 +4,7 @@ import kdtree as kd
 import parser as parse
 import visualize as vs
 
-file = "cube"
+file = "bunny"
 extension = "off"
 folder = "off_files"
 path = f'{folder}/{file}.{extension}'
