@@ -103,40 +103,94 @@ struct EuclideanDistance {
  * This is not yet a spatial data structure :)
  */
 class SpatialDataStructure {
-   public:
-    SpatialDataStructure(std::vector<Point> const& points) : m_points(points) {}
+public:
+    struct KDTreeNode {
+        Point point;
+        unsigned int index;
+
+        KDTreeNode* left = nullptr;
+        KDTreeNode* right = nullptr;
+
+        int axis; // 0 = x, 1 = y, 2 = z
+    };
+
+    SpatialDataStructure(std::vector<Point> const& points) : m_points(points) {
+        std::vector<std::pair<Point, std::size_t>> pointIndexPairs;
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            pointIndexPairs.push_back({points[i], i});
+        }
+        root = buildKDTree(pointIndexPairs, 0);
+    }
 
     virtual ~SpatialDataStructure() = default;
 
-    std::vector<Point> const& getPoints() const { return m_points; }
+    std::vector<Point> const& getPoints() const { 
+        return m_points; 
+    }
 
     virtual std::vector<std::size_t> collectInRadius(Point const& p, float radius) const {
         std::vector<std::size_t> result;
 
-        // Dummy brute-force implementation
-        // TODO: Use spatial data structure for sub-linear search
-        for (std::size_t i = 0; i < m_points.size(); ++i) {
-            float distance = EuclideanDistance::measure(p, m_points[i]);
-            if (distance <= radius) result.push_back(i);
-        }
+        // // Dummy brute-force implementation
+        // // TODO: Use spatial data structure for sub-linear search
+        // for (std::size_t i = 0; i < m_points.size(); ++i) {
+        //     float distance = EuclideanDistance::measure(p, m_points[i]);
+        //     if (distance <= radius) result.push_back(i);
+        // }
 
+        std::vector<std::size_t> resultIndices;
+
+        collectInRadiusRecursive(root, p, radius, resultIndices);
+        
         return result;
     }
 
-    virtual std::vector<std::size_t> collectKNearest(Point const& p, unsigned int k) const {
-        std::vector<std::size_t> result;
-
-        // Bogus knn implementation, giving you the first k points!
-        // TODO: Use spatial data structure for sub-linear search
-        for (std::size_t i = 0; (i < k) && (i < m_points.size()); ++i) {
-            result.push_back(i);
+    void collectInRadiusRecursive(KDTreeNode* node, Point const& p, float radius, std::vector<std::size_t>& resultIndices) const {
+        if (node == nullptr) {
+            return;
         }
 
-        return result;
+        
     }
+
+    // virtual std::vector<std::size_t> collectKNearest(Point const& p, unsigned int k) const {
+    //     std::vector<std::size_t> result;
+
+    //     // Bogus knn implementation, giving you the first k points!
+    //     // TODO: Use spatial data structure for sub-linear search
+    //     for (std::size_t i = 0; (i < k) && (i < m_points.size()); ++i) {
+    //         result.push_back(i);
+    //     }
+
+    //     return result;
+    // }
 
    private:
     std::vector<Point> m_points;
+    KDTreeNode* root = nullptr;
+
+    KDTreeNode* buildKDTree(std::vector<std::pair<Point, std::size_t>> points, int depth) {
+        int axis = depth % 3;
+
+        std::sort(points.begin(), points.end(), [axis](const std::pair<Point, std::size_t>& a, const std::pair<Point, std::size_t>& b){
+            return a.first[axis] < b.first[axis];
+        });
+
+        std::size_t medianIndex = points.size() / 2;
+
+        KDTreeNode* node = new KDTreeNode();
+        node->point = points[medianIndex].first;
+        node->index = points[medianIndex].second;
+        node->axis = axis;
+
+        std::vector<std::pair<Point, std::size_t>> leftPoints(points.begin(), points.begin() + medianIndex);
+        std::vector<std::pair<Point, std::size_t>> rightPoints(points.begin() + medianIndex + 1, points.end());
+
+        node->left = buildKDTree(leftPoints, depth + 1);
+        node->right = buildKDTree(rightPoints, depth + 1);
+
+        return node;
+    }
 };
 
 // Application variables
