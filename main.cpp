@@ -150,7 +150,30 @@ public:
             return;
         }
 
-        
+        float distance = EuclideanDistance::measure(p, node->point);
+
+        if (distance <= radius) {
+            resultIndices.push_back(node->index);
+        }
+
+        KDTreeNode* closerChild ;
+        KDTreeNode* otherChild;
+
+        float axisDistance = p[node->axis] - node->point[node->axis];
+
+        if (axisDistance < 0){
+            closerChild = node->left;
+            otherChild = node->right;
+        } else {
+            closerChild = node->right;
+            otherChild = node->left;
+        }
+
+        collectInRadiusRecursive(closerChild, p, radius, resultIndices);
+
+        if (std::abs(axisDistance) <= radius) {
+            collectInRadiusRecursive(otherChild, p, radius, resultIndices);
+        }
     }
 
     // virtual std::vector<std::size_t> collectKNearest(Point const& p, unsigned int k) const {
