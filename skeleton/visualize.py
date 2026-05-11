@@ -1,4 +1,5 @@
 import polyscope as ps
+import polyscope.imgui as psim
 import numpy as np
 
 def get_bounding_lines(center, half_size):
@@ -29,7 +30,8 @@ def draw_box_lines(all_nodes):
     
 
 def show_pointcloud(verts):
-    ps.register_point_cloud("my points", verts)
+    pointcloud = ps.register_point_cloud("my points", verts)
+    return pointcloud
 
 def show_mesh(verts, faces):
     ps.register_surface_mesh("my mesh", verts, faces, smooth_shade=True)

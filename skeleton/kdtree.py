@@ -4,7 +4,6 @@ def get_pivot(verts):
         max_axis = np.max(verts, axis=0)
         min_axis = np.min(verts, axis=0)
         max_dist = np.argmax(max_axis - min_axis)
-        print(max_dist)
         index = int(np.trunc(len(verts) / 2))
 
         axis_array = verts[:,max_dist]
