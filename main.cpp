@@ -25,6 +25,10 @@ using Point = std::array<float, 3>;
 using Normal = std::array<float, 3>;
 using Face = std::array<unsigned int, 3>;
 
+static int selectedIdx = 0;
+static float radius = 0.05f;
+static std::vector<glm::vec3> colors;
+
 void readOff(const std::string& filename, std::vector<Point>& points, std::vector<Normal>& normals) {
 
     std::vector<Face> faces;
@@ -266,12 +270,46 @@ void callback() {
 
                 // Build spatial data structure
                 sds = std::make_unique<SpatialDataStructure>(points);
+
+                // Initialize colors
+                colors.resize(points.size(), {28.f/255.f, 99.f/255.f, 227.f/255.f}); // ich will diese farbe: #1C63E3
             }
         }
     }
+    if (pc != nullptr) {
 
-    // TODO: Implement radius search
-    // TODO: Implement visualizations
+        ImGui::InputInt("Point Index", &selectedIdx);
+        ImGui::SliderFloat("Radius", &radius, 0.0f, 0.5f);
+
+        selectedIdx = std::clamp(selectedIdx, 0, (int)colors.size() - 1);
+
+        pc->addColorQuantity("Colors", colors)->setEnabled(true);
+
+        if (ImGui::Button("Collect in Radius")) {
+
+            if (sds && !sds->getPoints().empty()) {
+
+                const auto& points = sds->getPoints();
+
+                Point pivot = points[selectedIdx];
+
+                auto resultIndices = sds->collectInRadius(pivot, radius);
+
+                printf("Found %zu neighbors within radius %.2f of point %d\n",
+                    resultIndices.size(), radius, selectedIdx);
+
+                std::fill(colors.begin(), colors.end(), glm::vec3(28.f/255.f, 99.f/255.f, 227.f/255.f));
+
+                colors[selectedIdx] = glm::vec3(1.f, 0.f, 0.f);
+
+                for (std::size_t idx : resultIndices) {
+                    colors[idx] = glm::vec3(0.f, 1.f, 0.f);
+                }
+
+                pc->addColorQuantity("Colors", colors)->setEnabled(true);
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv) {
