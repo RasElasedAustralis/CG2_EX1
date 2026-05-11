@@ -18,6 +18,8 @@
 #include "portable-file-dialogs.h"
 
 #include <fstream>
+#include <algorithm>
+#include <queue>
 
 using Point = std::array<float, 3>;
 using Normal = std::array<float, 3>;
@@ -33,18 +35,6 @@ void readOff(const std::string& filename, std::vector<Point>& points, std::vecto
 
     std::default_random_engine engine(std::random_device{}());
     std::uniform_real_distribution<float> distribution(-1.f, 1.f);
-
-    /*
-    for (unsigned int i = 0; i < 100; ++i) {
-        points.emplace_back(Point{
-            distribution(engine),
-            distribution(engine),
-            distribution(engine)
-        });
-    }
-
-    polyscope::warning("Reading *.off files is not implemented. Generated a dummy point cloud.");
-    */
 
     std::ifstream file(filename);
     std::string header;
@@ -104,6 +94,8 @@ struct EuclideanDistance {
  */
 class SpatialDataStructure {
 public:
+    using Neighbor = std::pair<float, std::size_t>;
+
     struct KDTreeNode {
         Point point;
         unsigned int index;
@@ -131,18 +123,11 @@ public:
     virtual std::vector<std::size_t> collectInRadius(Point const& p, float radius) const {
         std::vector<std::size_t> result;
 
-        // // Dummy brute-force implementation
-        // // TODO: Use spatial data structure for sub-linear search
-        // for (std::size_t i = 0; i < m_points.size(); ++i) {
-        //     float distance = EuclideanDistance::measure(p, m_points[i]);
-        //     if (distance <= radius) result.push_back(i);
-        // }
-
         std::vector<std::size_t> resultIndices;
 
         collectInRadiusRecursive(root, p, radius, resultIndices);
         
-        return result;
+        return resultIndices;
     }
 
     void collectInRadiusRecursive(KDTreeNode* node, Point const& p, float radius, std::vector<std::size_t>& resultIndices) const {
@@ -176,19 +161,53 @@ public:
         }
     }
 
-    // virtual std::vector<std::size_t> collectKNearest(Point const& p, unsigned int k) const {
-    //     std::vector<std::size_t> result;
+    virtual std::vector<std::size_t> collectKNearest(Point const& p, unsigned int k) const {
+        std::priority_queue<Neighbor> heap; 
 
-    //     // Bogus knn implementation, giving you the first k points!
-    //     // TODO: Use spatial data structure for sub-linear search
-    //     for (std::size_t i = 0; (i < k) && (i < m_points.size()); ++i) {
-    //         result.push_back(i);
-    //     }
+        collectKNearestRecursive(root, p, k, heap);
 
-    //     return result;
-    // }
+        std::vector<std::size_t> resultIndices;
+        while (!heap.empty()) {
+            resultIndices.push_back(heap.top().second);
+            heap.pop();
+        }
 
-   private:
+        return resultIndices;
+    }
+
+    void collectKNearestRecursive(KDTreeNode* node, Point const& p, unsigned int k, std::priority_queue<Neighbor>& heap) const {
+        if (node == nullptr) {
+            return;
+        }
+
+        float distance = EuclideanDistance::measure(p, node->point);
+
+        if (heap.size() < k) {
+            heap.push({distance, node->index});
+        } else if (distance < heap.top().first) {
+            heap.pop();
+            heap.push({distance, node->index});
+        }
+
+        float distAxis = p[node->axis] - node->point[node->axis];
+
+        KDTreeNode* closerChild;
+        KDTreeNode* otherChild;
+
+        if (distAxis < 0) {
+            closerChild = node->left;
+            otherChild = node->right;
+        } else {
+            closerChild = node->right;
+            otherChild = node->left;
+        }
+
+        if (heap.size() < k || std::abs(distAxis) < heap.top().first) {
+            collectKNearestRecursive(otherChild, p, k, heap);
+        }
+    }
+
+private:
     std::vector<Point> m_points;
     KDTreeNode* root = nullptr;
 
