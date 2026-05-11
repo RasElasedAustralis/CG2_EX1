@@ -20,6 +20,7 @@
 #include <fstream>
 #include <algorithm>
 #include <queue>
+#include <chrono>
 
 using Point = std::array<float, 3>;
 using Normal = std::array<float, 3>;
@@ -220,6 +221,34 @@ public:
         }
     }
 
+    std::vector<std::size_t> bruteForceKNearest(Point const& p, unsigned int k) const
+    {
+        std::priority_queue<Neighbor> heap;
+        for (std::size_t i = 0; i < m_points.size(); ++i)
+        {
+            float dist = EuclideanDistance::measure(p, m_points[i]);
+            if (heap.size() < k)
+            {
+                heap.push({dist, i});
+            }
+            else if (dist < heap.top().first)
+            {
+                heap.pop();
+                heap.push({dist, i});
+            }
+        }
+
+        std::vector<std::size_t> result;
+        result.reserve(heap.size());
+        while (!heap.empty())
+        {
+            result.push_back(heap.top().second);
+            heap.pop();
+        }
+        return result;
+    }
+    
+
 private:
     std::vector<Point> m_points;
     KDTreeNode* root = nullptr;
@@ -252,6 +281,34 @@ private:
     }
 };
 
+std::pair<float, float> runtimeDifferenceRadiusSearch(SpatialDataStructure const& sds, Point const& p, float radius) {
+    auto startKD = std::chrono::high_resolution_clock::now();
+    sds.collectInRadius(p, radius);
+    auto endKD = std::chrono::high_resolution_clock::now();
+    auto startBrute = std::chrono::high_resolution_clock::now();
+    sds.bruteForceRadiusSearch(p, radius);
+    auto endBrute = std::chrono::high_resolution_clock::now();
+
+    float kdTime = std::chrono::duration<float, std::milli>(endKD - startKD).count();
+    float bruteTime = std::chrono::duration<float, std::milli>(endBrute - startBrute).count();
+
+    return {kdTime, bruteTime};
+}
+
+std::pair<float, float> runtimeDifferenceKNearestSearch(SpatialDataStructure const& sds, Point const& p, unsigned int k) {
+    auto startKD = std::chrono::high_resolution_clock::now();
+    sds.collectKNearest(p, k);
+    auto endKD = std::chrono::high_resolution_clock::now();
+    auto startBrute = std::chrono::high_resolution_clock::now();
+    sds.bruteForceKNearest(p, k);
+    auto endBrute = std::chrono::high_resolution_clock::now();
+
+    float kdTime = std::chrono::duration<float, std::milli>(endKD - startKD).count();
+    float bruteTime = std::chrono::duration<float, std::milli>(endBrute - startBrute).count();
+
+    return {kdTime, bruteTime};
+}
+
 // Application variables
 polyscope::PointCloud* pc = nullptr;
 std::unique_ptr<SpatialDataStructure> sds;
@@ -276,12 +333,11 @@ void callback() {
                 sds = std::make_unique<SpatialDataStructure>(points);
 
                 // Initialize colors
-                colors.resize(points.size(), {28.f/255.f, 99.f/255.f, 227.f/255.f}); // ich will diese farbe: #1C63E3
+                colors.resize(points.size(), {240.f/255.f, 214.f/255.f, 69.f/255.f}); // ich will diese farbe: #f0d645
             }
         }
     }
     if (pc != nullptr) {
-
         ImGui::InputInt("Point Index", &selectedIdx);
         ImGui::InputFloat("Radius", &radius);
         selectedIdx = std::clamp(selectedIdx, 0, (int)colors.size() - 1);
@@ -301,7 +357,7 @@ void callback() {
                 printf("Found %zu neighbors within radius %.2f of point %d\n",
                     resultIndices.size(), radius, selectedIdx);
 
-                std::fill(colors.begin(), colors.end(), glm::vec3(28.f/255.f, 99.f/255.f, 227.f/255.f));
+                std::fill(colors.begin(), colors.end(), glm::vec3(240.f/255.f, 214.f/255.f, 69.f/255.f));
 
                 colors[selectedIdx] = glm::vec3(1.f, 0.f, 0.f);
 
@@ -325,7 +381,7 @@ void callback() {
 
                 printf("Found %zu nearest neighbors of point %d\n", resultIndices.size(), selectedIdx);
 
-                std::fill(colors.begin(), colors.end(), glm::vec3(28.f/255.f, 99.f/255.f, 227.f/255.f));
+                std::fill(colors.begin(), colors.end(), glm::vec3(240.f/255.f, 214.f/255.f, 69.f/255.f));
 
                 colors[selectedIdx] = glm::vec3(1.f, 0.f, 0.f);
 
@@ -333,6 +389,26 @@ void callback() {
                     colors[idx] = glm::vec3(0.f, 1.f, 0.f);
                 }
                 pc->addColorQuantity("Colors", colors)->setEnabled(true);
+            }
+        }
+
+        if (ImGui::Button("Runtime Difference Radius Search")) {
+            if (sds && !sds->getPoints().empty()) {
+                const auto& points = sds->getPoints();
+                Point pivot = points[selectedIdx];
+                auto [kdTime, bruteTime] = runtimeDifferenceRadiusSearch(*sds, pivot, radius);
+                printf("KD-Tree Radius Search Time: %.2f ms\n", kdTime);
+                printf("Brute Force Radius Search Time: %.2f ms\n", bruteTime);
+            }
+        }
+
+        if (ImGui::Button("Runtime Difference K-Nearest Search")) {
+            if (sds && !sds->getPoints().empty()) {
+                const auto& points = sds->getPoints();
+                Point pivot = points[selectedIdx];
+                auto [kdTime, bruteTime] = runtimeDifferenceKNearestSearch(*sds, pivot, k);
+                printf("KD-Tree K-Nearest Search Time: %.2f ms\n", kdTime);
+                printf("Brute Force K-Nearest Search Time: %.2f ms\n", bruteTime);
             }
         }
     }
