@@ -193,21 +193,25 @@ public:
     KDTreeNode* root = nullptr;
 
     KDTreeNode* buildKDTree(std::vector<std::pair<Point, std::size_t>> points, int depth) {
+        if (points.empty()) {
+            return nullptr;
+        }
+
         int axis = depth % 3;
 
-        std::sort(points.begin(), points.end(), [axis](const std::pair<Point, std::size_t>& a, const std::pair<Point, std::size_t>& b){
-            return a.first[axis] < b.first[axis];
-        });
+        std::size_t median = points.size() / 2;
 
-        std::size_t medianIndex = points.size() / 2;
+        std::nth_element(points.begin(), points.begin() + median, points.end(), [axis](const std::pair<Point, std::size_t>& a, const std::pair<Point, std::size_t>& b){
+            return a.first[axis] < b.first[axis];
+        }); //if i got it right this is like quicksort so O(n) on average
 
         KDTreeNode* node = new KDTreeNode();
-        node->point = points[medianIndex].first;
-        node->index = points[medianIndex].second;
+        node->point = points[median].first;
+        node->index = points[median].second;
         node->axis = axis;
 
-        std::vector<std::pair<Point, std::size_t>> leftPoints(points.begin(), points.begin() + medianIndex);
-        std::vector<std::pair<Point, std::size_t>> rightPoints(points.begin() + medianIndex + 1, points.end());
+        std::vector<std::pair<Point, std::size_t>> leftPoints(points.begin(), points.begin() + median);
+        std::vector<std::pair<Point, std::size_t>> rightPoints(points.begin() + median + 1, points.end());
 
         node->left = buildKDTree(leftPoints, depth + 1);
         node->right = buildKDTree(rightPoints, depth + 1);
