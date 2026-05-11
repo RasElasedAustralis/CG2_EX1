@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -16,6 +18,8 @@
 #include "polyscope/point_cloud.h"
 #include "polyscope/polyscope.h"
 #include "portable-file-dialogs.h"
+
+#include "polyscope/curve_network.h"
 
 #include <fstream>
 #include <algorithm>
@@ -96,6 +100,11 @@ class SpatialDataStructure {
 public:
     using Neighbor = std::pair<float, std::size_t>;
 
+    struct BoundingBox {
+        Point min;
+        Point max;
+    };
+
     struct KDTreeNode {
         Point point;
         unsigned int index;
@@ -104,6 +113,8 @@ public:
         KDTreeNode* right = nullptr;
 
         int axis; // 0 = x, 1 = y, 2 = z
+
+        BoundingBox bbox; 
     };
 
     SpatialDataStructure(std::vector<Point> const& points) : m_points(points) {
@@ -111,7 +122,21 @@ public:
         for (std::size_t i = 0; i < points.size(); ++i) {
             pointIndexPairs.push_back({points[i], i});
         }
-        root = buildKDTree(pointIndexPairs, 0);
+        Point minPoint = points[0];
+        Point maxPoint = points[0];
+
+        for (const auto& p : points) {
+            for (int i = 0; i < 3; ++i) {
+                minPoint[i] = std::min(minPoint[i], p[i]);
+                maxPoint[i] = std::max(maxPoint[i], p[i]);
+            }
+        }
+
+        BoundingBox bbox;
+        bbox.min = minPoint;
+        bbox.max = maxPoint;
+
+        root = buildKDTree(pointIndexPairs, 0, bbox);
     }
 
     virtual ~SpatialDataStructure() = default;
@@ -121,6 +146,8 @@ public:
     }
 
     virtual std::vector<std::size_t> collectInRadius(Point const& p, float radius) const {
+        visitedBoxes.clear();
+
         std::vector<std::size_t> result;
 
         std::vector<std::size_t> resultIndices;
@@ -134,6 +161,8 @@ public:
         if (node == nullptr) {
             return;
         }
+
+        visitedBoxes.push_back(node->bbox);
 
         float distance = EuclideanDistance::measure(p, node->point);
 
@@ -247,13 +276,17 @@ public:
         }
         return result;
     }
-    
+
+    std::vector<BoundingBox> const& getVisitedBoxes() const {
+        return visitedBoxes;
+    }
 
 private:
     std::vector<Point> m_points;
     KDTreeNode* root = nullptr;
+    mutable std::vector<BoundingBox> visitedBoxes;
 
-    KDTreeNode* buildKDTree(std::vector<std::pair<Point, std::size_t>> points, int depth) {
+    KDTreeNode* buildKDTree(std::vector<std::pair<Point, std::size_t>> points, int depth, BoundingBox const& bbox) {
         if (points.empty()) {
             return nullptr;
         }
@@ -267,6 +300,7 @@ private:
         }); //if i got it right this is like quicksort so O(n) on average
 
         KDTreeNode* node = new KDTreeNode();
+        node->bbox = bbox;
         node->point = points[median].first;
         node->index = points[median].second;
         node->axis = axis;
@@ -274,8 +308,14 @@ private:
         std::vector<std::pair<Point, std::size_t>> leftPoints(points.begin(), points.begin() + median);
         std::vector<std::pair<Point, std::size_t>> rightPoints(points.begin() + median + 1, points.end());
 
-        node->left = buildKDTree(leftPoints, depth + 1);
-        node->right = buildKDTree(rightPoints, depth + 1);
+        BoundingBox leftBBox = bbox;
+        BoundingBox rightBBox = bbox;
+
+        leftBBox.max[axis] = node->point[axis];
+        rightBBox.min[axis] = node->point[axis];
+
+        node->left = buildKDTree(leftPoints, depth + 1, leftBBox); 
+        node->right = buildKDTree(rightPoints, depth + 1, rightBBox);
 
         return node;
     }
@@ -313,11 +353,20 @@ std::pair<float, float> runtimeDifferenceKNearestSearch(SpatialDataStructure con
 polyscope::PointCloud* pc = nullptr;
 std::unique_ptr<SpatialDataStructure> sds;
 
+static float lastKdRadiusTime = 0.f;
+static float lastBruteRadiusTime = 0.f;
+static bool showRadiusTiming = false;
+
+static float lastKdKTime = 0.f;
+static float lastBruteKTime = 0.f;
+static bool showKNearestTiming = false;
+
 void callback() {
     if (ImGui::Button("Load Off")) {
-        auto paths =
-            pfd::open_file("Load Off", "", std::vector<std::string>{"point data (*.off)", "*.off"}, pfd::opt::none)
-                .result();
+        showRadiusTiming = false;
+        showKNearestTiming = false;
+
+        auto paths = pfd::open_file("Load Off", "", std::vector<std::string>{"point data (*.off)", "*.off"}, pfd::opt::none).result();
         if (!paths.empty()) {
             std::filesystem::path path(paths[0]);
 
@@ -399,7 +448,15 @@ void callback() {
                 auto [kdTime, bruteTime] = runtimeDifferenceRadiusSearch(*sds, pivot, radius);
                 printf("KD-Tree Radius Search Time: %.2f ms\n", kdTime);
                 printf("Brute Force Radius Search Time: %.2f ms\n", bruteTime);
+                lastKdRadiusTime = kdTime;
+                lastBruteRadiusTime = bruteTime;
+                showRadiusTiming = true;
             }
+        }
+
+        if (showRadiusTiming) {
+            ImGui::Text("KD-Tree Radius Search Time: %.2f ms", lastKdRadiusTime);
+            ImGui::Text("Brute Force Radius Search Time: %.2f ms", lastBruteRadiusTime);
         }
 
         if (ImGui::Button("Runtime Difference K-Nearest Search")) {
@@ -409,7 +466,58 @@ void callback() {
                 auto [kdTime, bruteTime] = runtimeDifferenceKNearestSearch(*sds, pivot, k);
                 printf("KD-Tree K-Nearest Search Time: %.2f ms\n", kdTime);
                 printf("Brute Force K-Nearest Search Time: %.2f ms\n", bruteTime);
+                lastKdKTime = kdTime;
+                lastBruteKTime = bruteTime;
+                showKNearestTiming = true;
             }
+        }
+
+        if (showKNearestTiming) {
+            ImGui::Text("KD-Tree K-Nearest Search Time: %.2f ms", lastKdKTime);
+            ImGui::Text("Brute Force K-Nearest Search Time: %.2f ms", lastBruteKTime);
+        }
+
+        if (ImGui::Button("Show Traversal Boxes")){
+            std::vector<Point> vertices;
+            std::vector<std::array<size_t, 2>> edges;
+            printf("Visited %zu boxes during last search\n", sds->getVisitedBoxes().size());
+            for (const auto& box : sds->getVisitedBoxes()) {
+
+                Point min = box.min;
+                Point max = box.max;
+
+                size_t start = vertices.size();
+
+                vertices.push_back({min[0], min[1], min[2]});
+                vertices.push_back({max[0], min[1], min[2]});
+                vertices.push_back({max[0], max[1], min[2]});
+                vertices.push_back({min[0], max[1], min[2]});
+
+                vertices.push_back({min[0], min[1], max[2]});
+                vertices.push_back({max[0], min[1], max[2]});
+                vertices.push_back({max[0], max[1], max[2]});
+                vertices.push_back({min[0], max[1], max[2]});
+
+                edges.push_back({start+0, start+1});
+                edges.push_back({start+1, start+2});
+                edges.push_back({start+2, start+3});
+                edges.push_back({start+3, start+0});
+
+                edges.push_back({start+4, start+5});
+                edges.push_back({start+5, start+6});
+                edges.push_back({start+6, start+7});
+                edges.push_back({start+7, start+4});
+
+                edges.push_back({start+0, start+4});
+                edges.push_back({start+1, start+5});
+                edges.push_back({start+2, start+6});
+                edges.push_back({start+3, start+7});
+            }
+
+            polyscope::CurveNetwork* network = polyscope::registerCurveNetwork("Traversal Boxes", vertices, edges);
+
+            network->setColor(glm::vec3(1.f, 0.f, 0.f));
+            network->setRadius(0.0005);
         }
     }
 }
