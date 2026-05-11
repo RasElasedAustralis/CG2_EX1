@@ -29,6 +29,8 @@ static int selectedIdx = 0;
 static float radius = 0.05f;
 static std::vector<glm::vec3> colors;
 
+static int k = 5;
+
 void readOff(const std::string& filename, std::vector<Point>& points, std::vector<Normal>& normals) {
 
     std::vector<Face> faces;
@@ -211,6 +213,8 @@ public:
             otherChild = node->left;
         }
 
+        collectKNearestRecursive(closerChild, p, k, heap);
+
         if (heap.size() < k || std::abs(distAxis) < heap.top().first) {
             collectKNearestRecursive(otherChild, p, k, heap);
         }
@@ -279,8 +283,7 @@ void callback() {
     if (pc != nullptr) {
 
         ImGui::InputInt("Point Index", &selectedIdx);
-        ImGui::SliderFloat("Radius", &radius, 0.0f, 0.5f);
-
+        ImGui::InputFloat("Radius", &radius);
         selectedIdx = std::clamp(selectedIdx, 0, (int)colors.size() - 1);
 
         pc->addColorQuantity("Colors", colors)->setEnabled(true);
@@ -306,6 +309,29 @@ void callback() {
                     colors[idx] = glm::vec3(0.f, 1.f, 0.f);
                 }
 
+                pc->addColorQuantity("Colors", colors)->setEnabled(true);
+            }
+        }
+
+        ImGui::InputInt("K-nearest", &k);
+        if (ImGui::Button("Collect K-Nearest")) {
+            if (sds && !sds->getPoints().empty()) {
+
+                const auto& points = sds->getPoints();
+
+                Point pivot = points[selectedIdx];
+
+                auto resultIndices = sds->collectKNearest(pivot, k);
+
+                printf("Found %zu nearest neighbors of point %d\n", resultIndices.size(), selectedIdx);
+
+                std::fill(colors.begin(), colors.end(), glm::vec3(28.f/255.f, 99.f/255.f, 227.f/255.f));
+
+                colors[selectedIdx] = glm::vec3(1.f, 0.f, 0.f);
+
+                for (std::size_t idx : resultIndices) {
+                    colors[idx] = glm::vec3(0.f, 1.f, 0.f);
+                }
                 pc->addColorQuantity("Colors", colors)->setEnabled(true);
             }
         }
