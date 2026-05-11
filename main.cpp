@@ -62,16 +62,9 @@ void readOff(const std::string& filename, std::vector<Point>& points, std::vecto
             Face face;
             for (unsigned int j = 0; j < numVerticesInFace; ++j) {
                 file >> face[j];
-            }
-            if (i == 0)
-            {
-                std::cout << "face: " << face[0] << ", " << face[1] << ", " << face[2] << std::endl;
-            }
-            
+            }      
             faces.push_back(face);
         }
-        
-
     }
 }
 
@@ -159,6 +152,18 @@ public:
         if (std::abs(axisDistance) <= radius) {
             collectInRadiusRecursive(otherChild, p, radius, resultIndices);
         }
+    }
+
+    std::vector<std::size_t> bruteForceRadiusSearch(Point const& p, float radius) const {
+        std::vector<std::size_t> result;
+        for (std::size_t i = 0; i < m_points.size(); ++i) {
+            float distance = EuclideanDistance::measure(p, m_points[i]);
+            if (distance <= radius) {
+                result.push_back(i);
+            }
+        }
+
+        return result;
     }
 
     virtual std::vector<std::size_t> collectKNearest(Point const& p, unsigned int k) const {
