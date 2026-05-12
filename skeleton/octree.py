@@ -148,7 +148,7 @@ class Octree:
         self.knn_search(self.root, query, k, heap)
 
         results = [(np.sqrt(-dist_2), i) for dist_2, i in heap]
-        results.sort(key=lambda x: x[0])
+        #results.sort(key=lambda x: x[0])
 
         return results
     

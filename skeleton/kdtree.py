@@ -46,14 +46,4 @@ class KDTree:
             new_node.right_child = self.build_kdtree(right_half, depth + 1)
             new_node.is_leaf = False
         return new_node
-
-    def create_kdtree(self):
-        axis, pivot, pivot_index, sorted_verts = get_pivot(self.verts)
-
-        root_node = KDNode(pivot, axis, 0)
-        self.root = root_node
-        self.root.left_child = self.build_kdtree(root_node, sorted_verts[0:pivot_index], root_node.depth + 1)
-        self.root.right_child = self.build_kdtree(root_node, sorted_verts[pivot_index+1:], root_node.depth + 1)
-
-    
         

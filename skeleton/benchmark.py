@@ -2,6 +2,8 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import octree as oc
+import parser as ps
+import heapq
 
 sizes = [
     1_000,
@@ -18,6 +20,11 @@ NUM_QUERIES = 100
 SAMPLE_SIZE = 10_000
 K = 12
 
+file = "bunny"
+extension = "off"
+folder = "off_files"
+path = f'{folder}/{file}.{extension}'
+
 def construct_random_octrees(tree_size, num_queries, depth=10, max_points=50):
     print(f"Testing N = {tree_size}, Queries = {num_queries}, Depth = {depth}, max Points = {max_points}")
     pts = np.random.rand(tree_size, 3)
@@ -25,6 +32,40 @@ def construct_random_octrees(tree_size, num_queries, depth=10, max_points=50):
     query_indices = np.random.randint(0, tree_size, size=num_queries)
 
     return pts, octree, query_indices
+
+def construct_r_octrees(tree_size, num_queries, depth=10, max_points=50):
+    print(f"Testing N = {tree_size}, Queries = {num_queries}, Depth = {depth}, max Points = {max_points}")
+    pts, faces = ps.get_vertecies_faces(path) #np.random.rand(tree_size, 3)
+    octree = oc.Octree(depth, max_points, pts)
+    query_indices = np.random.randint(0, tree_size, size=num_queries)
+
+    return pts, octree, query_indices
+
+def brute_force_knn(points, query, k):
+
+    heap = []
+
+    for idx, p in enumerate(points):
+
+        dist2 = np.sum((p - query) ** 2)
+
+        if len(heap) < k:
+            heapq.heappush(heap, (-dist2, idx))
+
+        else:
+            worst_dist2 = -heap[0][0]
+
+            if dist2 < worst_dist2:
+                heapq.heapreplace(heap, (-dist2, idx))
+
+    results = [
+        (np.sqrt(-dist2), idx)
+        for dist2, idx in heap
+    ]
+
+    results.sort(key=lambda x: x[0])
+
+    return results
 
 def perform_size_benchmark(sizes, num_queries, k, radius):
     octree_times = []
