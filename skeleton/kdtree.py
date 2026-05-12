@@ -4,7 +4,7 @@ def get_pivot(verts):
         max_axis = np.max(verts, axis=0)
         min_axis = np.min(verts, axis=0)
         max_dist = np.argmax(max_axis - min_axis)
-        index = int(np.trunc(len(verts) / 2))
+        index = int(np.floor(len(verts) / 2))
 
         axis_array = verts[:,max_dist]
         sorted_along_axis = np.argsort(axis_array)
@@ -19,6 +19,8 @@ class KDNode:
         self.pivot = pivot
         self.axis = axis
         self.depth = depth
+        self.left_half = None
+        self.right_half = None
         self.left_child = None
         self.right_child = None
         self.is_leaf = True
@@ -29,31 +31,29 @@ class KDTree:
         self.max_depth = max_depth
         self.max_points = max_points
         self.verts = verts
-        self.root = None
+        self.root = self.build_kdtree(self.verts, 0)
 
         self.create_kdtree()
 
-    def build_kdtree(self, kd_node: KDNode, verts: np.ndarray):
-        if kd_node.depth >= self.max_depth:
-            return
-
-        if len(verts) > self.max_points:
-            axis, pivot, pivot_index, sorted_verts = get_pivot(verts)
-            new_node = KDNode(pivot, axis, kd_node.depth + 1)
-            left_half = sorted_verts[0:pivot_index]
-            right_half = sorted_verts[pivot_index+1:]
-            
-            new_node.left_child = self.build_kdtree(new_node, left_half)
-            new_node.right_child = self.build_kdtree(new_node, right_half)
+    def build_kdtree(self, verts: np.ndarray, depth):
+        axis, pivot, pivot_index, sorted_verts = get_pivot(verts)
+        new_node = KDNode(pivot, axis, depth)
+        left_half = sorted_verts[0:pivot_index]
+        right_half = sorted_verts[pivot_index+1:]
+        
+        if depth <= self.max_depth and len(left_half) >= self.max_points:
+            new_node.left_child = self.build_kdtree(left_half, depth + 1)
+            new_node.right_child = self.build_kdtree(right_half, depth + 1)
             new_node.is_leaf = False
+        return new_node
 
     def create_kdtree(self):
         axis, pivot, pivot_index, sorted_verts = get_pivot(self.verts)
 
         root_node = KDNode(pivot, axis, 0)
         self.root = root_node
-        self.root.left_child = self.build_kdtree(root_node, sorted_verts[0:pivot_index])
-        self.root.right_child = self.build_kdtree(root_node, sorted_verts[pivot_index+1:])
+        self.root.left_child = self.build_kdtree(root_node, sorted_verts[0:pivot_index], root_node.depth + 1)
+        self.root.right_child = self.build_kdtree(root_node, sorted_verts[pivot_index+1:], root_node.depth + 1)
 
     
         

@@ -1,4 +1,5 @@
 import numpy as np
+import heapq
 
 
 class OCNode:
@@ -30,7 +31,6 @@ class Octree:
         if p[2] > oc_node.center[2]: idx |= 4
 
         return idx
-
 
     def tree_division(self, oc_node: OCNode):
         half = oc_node.half_size / 2.0
@@ -107,10 +107,77 @@ class Octree:
         
         child_idx = self.get_node_for_point(oc_node, coords)
         return self.get_node_by_point(oc_node.children[child_idx], coords)
+    
+    def aabb_distance_squared(self, point, center, half_size):
+        min = center - half_size
+        max = center + half_size
 
+        delta = np.maximum(0, np.maximum(min - point, point - max))
+        return np.dot(delta, delta)
 
+    def knn_search(self, node: OCNode, query, k, heap):
+        if node.is_leaf:
+            for i in node.indices:
+                p = self.verts[i]
+                dist_2 = np.sum((p - query) ** 2)
+                if len(heap) < k:
+                    heapq.heappush(heap, (-dist_2, i))
+                else:
+                    worst_dist_2 = -heap[0][0]
+                    if dist_2 < worst_dist_2:
+                        heapq.heapreplace(heap, (-dist_2, i))
+            return
+        
+        child_distances = []
+        for child in node.children:
+            aabb_dist_2 = self.aabb_distance_squared(query, child.center, child.half_size)
+            child_distances.append((aabb_dist_2, child))
 
+        child_distances.sort(key=lambda x: x[0])
+        for d2, child in child_distances:
+            if len(heap) == k:
+                current_worst = -heap[0][0]
+                if d2 > current_worst:
+                    continue
 
+            self.knn_search(child, query, k, heap)
+
+    def knn_wrapper(self, selection_index, k=8):
+        heap = []
+        query = self.verts[selection_index]
+        self.knn_search(self.root, query, k, heap)
+
+        results = [(np.sqrt(-dist_2), i) for dist_2, i in heap]
+        results.sort(key=lambda x: x[0])
+
+        return results
+    
+    def radius_search(self, node: OCNode, query, radius_squared, results):
+        aabb_dist_2 = self.aabb_distance_squared(query, node.center, node.half_size)
+
+        if aabb_dist_2 >  radius_squared:
+            return
+        
+        if node.is_leaf:
+            for i in node.indices:
+                p = self.verts[i]
+                dist_2 = np.sum((p - query) ** 2)
+                
+                if dist_2 <= radius_squared:
+                    results.append(i)
+            return
+        
+        for child in node.children:
+            self.radius_search(child, query, radius_squared, results)
+
+    def radius_wrapper(self, selection_index, radius=0.01):
+        results = []
+        radius_squared = radius ** 2
+
+        query = self.verts[selection_index]
+        self.radius_search(self.root, query, radius_squared, results)
+
+        return results
 
 
         

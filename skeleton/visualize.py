@@ -20,11 +20,14 @@ def get_bounding_lines(center, half_size):
     return corners, edges
 
 def draw_box_lines(all_nodes):
+    curve_networks = []
     for i, node in enumerate(all_nodes):
         corners, edges = get_bounding_lines(node.center, node.half_size)
         curve_network = ps.register_curve_network(f'node_{i}', corners, edges)
         curve_network.set_color((1.0, 0.0, 0.0))
         curve_network.set_radius(0.001)
+        curve_networks.append(curve_network)
+    return curve_networks
 
 #def draw_planes():
     
