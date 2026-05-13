@@ -50,11 +50,11 @@ def load_off(path):
 
 def load_octree():
     if not ui_state["off_loaded"] or ui_state["octree"] != None: return
-    ui_state["octree"] = oc.Octree(6, 50, ui_state["verts"])
+    ui_state["octree"] = oc.Octree(10, 50, ui_state["verts"])
 
 def load_kdtree():
     if not ui_state["off_loaded"]or ui_state["kdtree"] != None: return
-    ui_state["kdtree"] = kd.KDTree(6, 50, ui_state["verts"])
+    ui_state["kdtree"] = kd.KDTree(10, 50, ui_state["verts"])
 
 
 def set_point_color(pointcloud: ps.PointCloud, indices, color, selection, s_color=(1.0, 0.0, 0.0)):
@@ -80,13 +80,13 @@ def handle_search():
     match ui_state["current_search_method"]:
         case "knn":
             if ui_state["octree"] is None: return
-            knn = ui_state["octree"].knn_wrapper(ui_state["mouse_selection"], 12)
+            knn = ui_state["octree"].knn_wrapper(ui_state["mouse_selection"], ui_state["k"])
             knn_indices = [i for _, i in knn]
             set_point_color(ui_state["pointcloud"], knn_indices, (0.0, 1.0, 0.0), ui_state["mouse_selection"], (1.0, 0.0, 0.0))
 
         case "radius":
             if ui_state["octree"] is None: return
-            radius_indices = ui_state["octree"].radius_wrapper(ui_state["mouse_selection"], 0.01)
+            radius_indices = ui_state["octree"].radius_wrapper(ui_state["mouse_selection"], ui_state["radius"])
             set_point_color(ui_state["pointcloud"], radius_indices, (0.0, 0.0, 1.0), ui_state["mouse_selection"], (1.0, 0.0, 0.0))
 
         case "None":
@@ -147,9 +147,6 @@ def callback():
 
         psim.EndCombo()
 
-    #depth_changed, ui_state["tree_depth"] = psim.SliderInt("Depth", ui_state["tree_depth"], v_min=1, v_max=20)
-    #bucket_size_changed, ui_state["bucket_size"] = psim.SliderInt("Bucket Size", ui_state["bucket_size"], v_min=1, v_max=100)
-
 
     changed, ui_state["tree_visible"] = psim.Checkbox("Show Spatial Datastructure", ui_state["tree_visible"])
     if changed and ui_state["tree_visible"] and ui_state["octree"] != None:
@@ -172,6 +169,12 @@ def callback():
 
         psim.EndCombo()
 
+    match ui_state["current_search_method"]:
+        case "knn":
+            k_changed, ui_state["k"] = psim.SliderInt("k", ui_state["k"], v_min=1, v_max=200)
+        case "radius":
+            radius_changed, ui_state["radius"] = psim.SliderFloat("Radius", ui_state["radius"], v_min=0.001, v_max=0.02)
+
     if psim.BeginCombo("Benchmark type", ui_state["current_benchmark_type"]):
         for type in benchmark_types:
             selected = (type == ui_state["current_benchmark_type"])
@@ -186,12 +189,6 @@ def callback():
         psim.EndCombo()
 
     if psim.Button("Run Benchmark"):
-        #oc_runtime, brute_runtime =  #np.random.random()
-        #oct, rad, brute = bm.perform_size_benchmark(sizes, 100, 12, 0.01)
-        #ui_state["oct_benchmark"] = oct
-        #ui_state["brute_benchmark"] = brute
-        #ui_state["rad_benchmark"] = rad
-        #ui_state["benchmarks_done"] = True
         handle_benchmarks()
 
     if ui_state["benchmarks_done"]:

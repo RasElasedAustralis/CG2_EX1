@@ -119,6 +119,7 @@ class Octree:
         if node.is_leaf:
             for i in node.indices:
                 p = self.verts[i]
+                if np.equal(p, query).all(): continue
                 dist_2 = np.sum((p - query) ** 2)
                 if len(heap) < k:
                     heapq.heappush(heap, (-dist_2, i))
@@ -147,26 +148,22 @@ class Octree:
         query = self.verts[selection_index]
         self.knn_search(self.root, query, k, heap)
 
-        results = [(np.sqrt(-dist_2), i) for dist_2, i in heap]
+        results = heap #[(np.sqrt(-dist_2), i) for dist_2, i in heap]
         #results.sort(key=lambda x: x[0])
 
         return results
     
     def radius_search(self, node: OCNode, query, radius_squared, results):
         aabb_dist_2 = self.aabb_distance_squared(query, node.center, node.half_size)
-
-        if aabb_dist_2 >  radius_squared:
+        if aabb_dist_2 > radius_squared:
             return
-        
         if node.is_leaf:
             for i in node.indices:
                 p = self.verts[i]
                 dist_2 = np.sum((p - query) ** 2)
-                
                 if dist_2 <= radius_squared:
                     results.append(i)
-            return
-        
+            return 
         for child in node.children:
             self.radius_search(child, query, radius_squared, results)
 
